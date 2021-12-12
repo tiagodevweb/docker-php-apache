@@ -1,5 +1,7 @@
 FROM php:7.4.26-apache-buster
 
+LABEL maintainer="tiago.dweb@gmail.com"
+
 # 1. Install development packages and clean up apt cache.
 RUN apt-get update && apt-get install -y \
     curl \
@@ -32,10 +34,8 @@ RUN echo "ServerName ${SERVER_NAME}" >> /etc/apache2/apache2.conf && \
 RUN a2enmod rewrite headers
 
 # 4. Start with base PHP config, then add extensions.
-RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
-COPY php/override.ini "$PHP_INI_DIR/conf.d/override.ini"
-
-RUN docker-php-ext-install \
+RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini" \
+    && docker-php-ext-install \
     bcmath \
     bz2 \
     calendar \
@@ -48,15 +48,16 @@ RUN docker-php-ext-install \
     docker-php-ext-configure gd && \
     docker-php-ext-install -j$(nproc) gd && \
     docker-php-source delete
+COPY php/override.ini "$PHP_INI_DIR/conf.d/override.ini"
 
 # 5. Composer.
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# 6. Create new user userapp which will be running inside the container
+# 6. Create new user appuser which will be running inside the container
 # it will have www-data as a secondary group and will sync with the same 1000 id set inside out .env file
 ARG uid=1000
-RUN useradd -u ${uid} -g www-data -m -s /bin/bash userapp
-USER userapp
+RUN useradd -u ${uid} -g www-data -m -s /bin/bash appuser
+USER appuser
 
 # 7. Test if container is still working.
 HEALTHCHECK --interval=60s --timeout=30s CMD nc -zv localhost 80 || exit 1
